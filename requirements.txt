@@ -1,0 +1,5 @@
+gtts
+pdfplumber
+textwrap
+pydub
+tempfile
