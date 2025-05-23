@@ -1,30 +1,50 @@
-# RFID Tracer
+# PDF to Voice
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.25.0-blue.svg)
 
+## 🎧 Introduction
+This tool converts PDF files into spoken audio (MP3). It handles both:
+- **Text-based PDFs** using `pdfplumber`
+- **Image-based PDFs** (like scanned documents) using **OCR** with `Tesseract` + `Poppler`.
 
-## Introduction
-------------
+Why? Because I don’t want to pay for Adobe’s read-aloud tools — and now I don’t need to.
 
-PDF to voice.
-Able to read the pdf as a text or as a picture. Using tesseract and poppler_bin for the image to text based conversion. Obviously, you could do this via a paid version of Adobe, but I don't have one nor do I want to buy one.
+---
 
-## Goal
-------------
+## 🎯 Goal
+- Convert any PDF (text or scanned image) to MP3 audio
+- Automatically detect if OCR is needed and fall back to it
+- Create chunked audio files and merge them with part intros
+- Save timestamps for easy reference
+- Make it easy to listen to essays, reports, or long documents while on the go
 
+---
 
-## How It Works
-------------
+## ⚙️ How It Works
+1. **PDF Detection**: Checks the first 3 pages to see if it's a scanned image (no extractable text).
+2. **Extraction**:
+   - Uses `pdfplumber` for regular text PDFs.
+   - Falls back to `pytesseract` + `pdf2image` for image-based PDFs.
+3. **Audio Conversion**:
+   - Breaks text into chunks (~4900 characters).
+   - Converts each chunk to MP3 using `gTTS`.
+   - Prepends a short “Part X” intro for navigation.
+4. **Merging**:
+   - Combines all MP3 parts into one audio file with pauses.
+   - Generates a `timestamps.txt` for reference.
 
+---
 
-## Features
-------------
+## ✨ Features
+- ✅ Automatic text vs image PDF detection
+- 🎙️ Converts to MP3 with part intros and pauses
+- 📑 Saves timestamps for audio indexing
+- 🧠 Handles long PDFs with chunking
+- 💡 Simple config via `config.conf`
+- 📦 Clean modular code using `support.py`
 
-
-## Dependencies and Installation
-----------------------------
-
+---
 
 ## Dependencies 
 ----------------------------
