@@ -35,6 +35,7 @@ AudioSegment.ffprobe = ffprobe_path
 
 # === CONFIG ===
 pdf_path = config.get('read', 'read_essay', fallback='Tell-Tale_Heart.pdf')
+pdf_path = config.get('read', 'read_essay', fallback='picture_pdf_text.pdf')
 if not os.path.exists(pdf_path):
     raise FileNotFoundError(f"❌ PDF not found at: {pdf_path}")
 output_dir = config.get('read', 'output_dir', fallback='output')

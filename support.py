@@ -5,6 +5,12 @@ import os
 import time
 from datetime import timedelta
 import pytesseract
+from pdf2image import convert_from_path
+
+import configparser
+import sys
+
+
 
 def clean_text(text):
     # Remove bracketed [1], parenthetical (12)
@@ -25,10 +31,67 @@ def clean_text(text):
     text = re.sub(r'\s{2,}', ' ', text)
     return text.strip()
 
+def init_pytesseract():
+    config = configparser.ConfigParser()
+    config.read('config.conf')
+
+    tesseract_path = config.get('paths', 'tesseract_path', fallback=None)
+    if not tesseract_path or not tesseract_path.strip():
+        print('❌ Error: tesseract_path is not configured in the CONF file.', file=sys.stderr)
+        raise ValueError('Need to configure tesseract_path in order to run this script.')
+
+    pytesseract.pytesseract.tesseract_cmd = tesseract_path
+
+    poppler_bin = config.get('paths', 'poppler_bin', fallback=None)
+    if not poppler_bin or not poppler_bin.strip():
+        print('❌ Error: poppler_bin is not configured in the CONF file.', file=sys.stderr)
+        raise ValueError('Need to configure poppler_bin in order to run this script.')
+
+    return poppler_bin
+
+def get_full_text_ocr(pdf_path):
+    poppler_bin = init_pytesseract()
+    full_text = ""
+
+    try:
+        pages = convert_from_path(pdf_path, poppler_path=poppler_bin, dpi=300)
+    except Exception as e:
+        raise RuntimeError(f"🚨 Failed to convert PDF to images: {e}")
+    for i, page_image in enumerate(pages):
+        print(f"Running OCR on page {i + 1}")
+        text = pytesseract.image_to_string(page_image)
+        if i==0:
+            print(text)
+        cleaned = clean_text(text)
+        full_text += f"\n\n[Page {i + 1}]\n{cleaned}"
+    return full_text
+
 def get_full_text(pdf_path, print_text=False):    
     full_text = ""
+    image_based_file=False
     with pdfplumber.open(pdf_path) as pdf:
         print(f"Total pages: {len(pdf.pages)}")
+        # determine if pdf is image based - if the first 2-5 pages are blank we know it's a picture based pdf and needs to be converted to text
+        # Check only the first 3 pages for real text
+        scanned_blank_pages = 0
+        for page_num in range(min(3, len(pdf.pages))):
+            page = pdf.pages[page_num]
+            text = page.extract_text()
+            if print_text:
+                print(f"[Scan Check] Page {page_num + 1} text: {repr(text)}")
+            if not text or not text.strip():
+                scanned_blank_pages += 1
+
+        if scanned_blank_pages == min(3, len(pdf.pages)):
+            print("First 3 pages are blank – likely image-based PDF. Switching to OCR...")
+            image_based_file = True
+        else:
+            print("Text found in first 3 pages moving forward with reading pdf")
+
+        # OCR fallback if image-based
+        if image_based_file:
+            return get_full_text_ocr(pdf_path)
+        
         for page_num, page in enumerate(pdf.pages):
             text = page.extract_text()
             if print_text:
@@ -54,17 +117,6 @@ def convert_to_mp3(chunks, output_dir, name='mp3_output',
                 break
     print(f"✅ Done! Saved {len(chunks)} MP3 files to:\n{output_dir}")
 
-def get_full_text_ocr(pdf_path):
-    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
-    full_text = ""
-    pages = convert_from_path(pdf_path)
-    for i, page_image in enumerate(pages):
-        print(f"Running OCR on page {i + 1}")
-        text = pytesseract.image_to_string(page_image)
-        cleaned = clean_text(text)
-        full_text += f"\n\n[Page {i + 1}]\n{cleaned}"
-    return full_text
 
 def merge_mp3s(AudioSegment, mp3_name, output_dir='output',
                audio_parts=False,

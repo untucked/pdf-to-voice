@@ -7,7 +7,8 @@
 ## Introduction
 ------------
 
-PDF to voice
+PDF to voice.
+Able to read the pdf as a text or as a picture. Using tesseract and poppler_bin for the image to text based conversion. Obviously, you could do this via a paid version of Adobe, but I don't have one nor do I want to buy one.
 
 ## Goal
 ------------
@@ -27,6 +28,7 @@ PDF to voice
 
 ## Dependencies 
 ----------------------------
+https://github.com/tesseract-ocr/tesseract
 
 ## GIT - CLONE
 ----------------------------
