@@ -4,6 +4,7 @@ from gtts import gTTS
 import os
 import time
 from datetime import timedelta
+import pytesseract
 
 def clean_text(text):
     # Remove bracketed [1], parenthetical (12)
@@ -24,13 +25,14 @@ def clean_text(text):
     text = re.sub(r'\s{2,}', ' ', text)
     return text.strip()
 
-def get_full_text(pdf_path):    
+def get_full_text(pdf_path, print_text=False):    
     full_text = ""
     with pdfplumber.open(pdf_path) as pdf:
         print(f"Total pages: {len(pdf.pages)}")
         for page_num, page in enumerate(pdf.pages):
             text = page.extract_text()
-            print(f"Page {page_num + 1} text: {repr(text)}")
+            if print_text:
+                print(f"Page {page_num + 1} text: {repr(text)}")
             if text:
                 print(f"Adding page {page_num + 1}")
                 # print(text)
@@ -52,6 +54,17 @@ def convert_to_mp3(chunks, output_dir, name='mp3_output',
                 break
     print(f"✅ Done! Saved {len(chunks)} MP3 files to:\n{output_dir}")
 
+def get_full_text_ocr(pdf_path):
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+    full_text = ""
+    pages = convert_from_path(pdf_path)
+    for i, page_image in enumerate(pages):
+        print(f"Running OCR on page {i + 1}")
+        text = pytesseract.image_to_string(page_image)
+        cleaned = clean_text(text)
+        full_text += f"\n\n[Page {i + 1}]\n{cleaned}"
+    return full_text
 
 def merge_mp3s(AudioSegment, mp3_name, output_dir='output',
                audio_parts=False,
@@ -95,8 +108,8 @@ def merge_mp3s(AudioSegment, mp3_name, output_dir='output',
             merged_audio += intro_audio + pause + part_audio + pause
             current_duration_ms += len(intro_audio) + len(pause) + len(part_audio) + len(pause)
         else:
-            merged_audio += intro_audio + pause + part_audio + pause
-            current_duration_ms = len(pause) + len(part_audio) + len(pause)
+            merged_audio += part_audio + pause
+            current_duration_ms = len(part_audio) + len(pause)
 
     # === Export final merged audio
     final_output = os.path.join(output_dir, f"{mp3_name}_full.mp3")

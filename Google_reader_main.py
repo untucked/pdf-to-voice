@@ -49,7 +49,12 @@ full_text = support.get_full_text(pdf_path)
 chunks = textwrap.wrap(full_text, chunk_size, break_long_words=False, break_on_hyphens=False)
 
 # === CONVERT EACH CHUNK TO MP3 ===
-mp3_name=f'{pdf_path}_mp3'
+# Get the base name (filename with extension, but no directory)
+base_name = os.path.basename(pdf_path)
+# Split the base name into name and extension
+file_name_without_extension, _ = os.path.splitext(base_name)
+# Now use the cleaned name for your MP3 file
+mp3_name = f'{file_name_without_extension}_mp3'
 support.convert_to_mp3(chunks, output_dir, name=mp3_name,
                    test_script=False)
 
