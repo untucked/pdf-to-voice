@@ -28,7 +28,17 @@ Able to read the pdf as a text or as a picture. Using tesseract and poppler_bin 
 
 ## Dependencies 
 ----------------------------
+
+ffmpeg & ffprobe:
+https://www.gyan.dev/ffmpeg/builds/
+https://github.com/Purple-CSGO/ffmpeg-gyan-git-builds/releases
+
+tesseract:
 https://github.com/tesseract-ocr/tesseract
+download: https://github.com/UB-Mannheim/tesseract/wiki
+
+Poppler:
+https://github.com/oschwartz10612/poppler-windows/releases/
 
 ## GIT - CLONE
 ----------------------------
