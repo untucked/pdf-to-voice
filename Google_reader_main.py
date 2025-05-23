@@ -8,6 +8,7 @@ from datetime import timedelta
 import re
 import time
 import configparser
+import sys
 
 config = configparser.ConfigParser()
 config.read('config.conf')
@@ -17,10 +18,15 @@ import support
 
 # Set paths BEFORE importing AudioSegment
 ffmpeg_path = config.get('paths', 'ffmpeg_path', fallback=None)
+if ffmpeg_path is None or not ffmpeg_path.strip(): # Also check for empty string
+    print('Error: ffmpeg_path is not configured in the CONF file.', file=sys.stderr)
+    raise ValueError('Need to configure ffmpeg_path in order to run this script.')
+
 ffprobe_path = config.get('paths', 'ffmpeg_probe', fallback=None)
-if ffmpeg_path==None:
-    print('Need to install ffmpeg and ffprobe in order to run this')
-    SystemError()
+if ffprobe_path is None or not ffprobe_path.strip(): # Also check for empty string
+    print('Error: ffprobe_path is not configured in the CONF file.', file=sys.stderr)
+    raise ValueError('Need to configure ffprobe_path in order to run this script.')
+
 
 os.environ["PATH"] += os.pathsep + os.path.dirname(ffmpeg_path)  # Add to PATH at runtime
 
@@ -28,7 +34,9 @@ AudioSegment.converter = ffmpeg_path
 AudioSegment.ffprobe = ffprobe_path
 
 # === CONFIG ===
-pdf_path = config.get('read', 'read_essay', fallback='the-essays-of-warren-buffett_preface.pdf')
+pdf_path = config.get('read', 'read_essay', fallback='Tell-Tale_Heart.pdf')
+if not os.path.exists(pdf_path):
+    raise FileNotFoundError(f"❌ PDF not found at: {pdf_path}")
 output_dir = config.get('read', 'output_dir', fallback='output')
 chunk_size = 4900  # Safe limit for gTTS (under 5000)
 
@@ -41,7 +49,7 @@ full_text = support.get_full_text(pdf_path)
 chunks = textwrap.wrap(full_text, chunk_size, break_long_words=False, break_on_hyphens=False)
 
 # === CONVERT EACH CHUNK TO MP3 ===
-mp3_name='mp3_output'
+mp3_name=f'{pdf_path}_mp3'
 support.convert_to_mp3(chunks, output_dir, name=mp3_name,
                    test_script=False)
 

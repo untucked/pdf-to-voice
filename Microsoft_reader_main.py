@@ -1,6 +1,10 @@
 import pdfplumber
 import pyttsx3
+import os
+import configparser
 
+config = configparser.ConfigParser()
+config.read('config.conf')
 # Initialize text-to-speech engine
 engine = pyttsx3.init()
 
@@ -9,7 +13,9 @@ engine.setProperty('rate', 200)  # Speed of speech
 engine.setProperty('volume', 1.0)  # Volume (0.0 to 1.0)
 
 # Load and read PDF
-pdf_path = r'C:\Users\bradley.eylander\OneDrive - LMI Consulting\Documents\Personal\equity\Alpha Metallurgical Resources (AMR) – Comprehensive Investment Analysis.pdf'
+pdf_path = config.get('read', 'read_essay', fallback='Tell-Tale_Heart.pdf')
+if not os.path.exists(pdf_path):
+    raise FileNotFoundError(f"❌ PDF not found at: {pdf_path}")
 
 with pdfplumber.open(pdf_path) as pdf:
     for page_num, page in enumerate(pdf.pages):

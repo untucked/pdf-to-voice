@@ -24,11 +24,13 @@ def clean_text(text):
     text = re.sub(r'\s{2,}', ' ', text)
     return text.strip()
 
-def get_full_text(pdf_path):
+def get_full_text(pdf_path):    
     full_text = ""
     with pdfplumber.open(pdf_path) as pdf:
+        print(f"Total pages: {len(pdf.pages)}")
         for page_num, page in enumerate(pdf.pages):
             text = page.extract_text()
+            print(f"Page {page_num + 1} text: {repr(text)}")
             if text:
                 print(f"Adding page {page_num + 1}")
                 # print(text)
@@ -51,7 +53,9 @@ def convert_to_mp3(chunks, output_dir, name='mp3_output',
     print(f"✅ Done! Saved {len(chunks)} MP3 files to:\n{output_dir}")
 
 
-def merge_mp3s(AudioSegment, mp3_name, output_dir='output',clean_mp3s=False):
+def merge_mp3s(AudioSegment, mp3_name, output_dir='output',
+               audio_parts=False,
+               clean_mp3s=False):
     print("🔊 Merging all MP3s into one file...")
 
     merged_audio = AudioSegment.empty()
@@ -65,19 +69,19 @@ def merge_mp3s(AudioSegment, mp3_name, output_dir='output',clean_mp3s=False):
         part_path = os.path.join(output_dir, filename)
 
         # === Generate "Part N" voice intro
-        part_intro_text = f"Part {i}"
-        tts = gTTS(part_intro_text, lang='en')
+        if audio_parts:
+            part_intro_text = f"Part {i}"
+            tts = gTTS(part_intro_text, lang='en')
 
-        # Save to temporary file
-        temp_intro_path = os.path.join(output_dir, f"intro_part_{i}.mp3")
-        tts.save(temp_intro_path)
-        if not os.path.exists(temp_intro_path):
-            raise FileNotFoundError(f"❌ gTTS failed to create file: {temp_intro_path}")
-        # Add a small delay (in seconds)
-        
-        time.sleep(10)  # Try a 0.1-second delay
-        intro_audio = AudioSegment.from_mp3(temp_intro_path)
-        os.remove(temp_intro_path)  # Clean up after use
+            # Save to temporary file
+            temp_intro_path = os.path.join(output_dir, f"intro_part_{i}.mp3")
+            tts.save(temp_intro_path)
+            if not os.path.exists(temp_intro_path):
+                raise FileNotFoundError(f"❌ gTTS failed to create file: {temp_intro_path}")
+            # Add a small delay (in seconds)        
+            time.sleep(10)  # Try a 0.1-second delay
+            intro_audio = AudioSegment.from_mp3(temp_intro_path)
+            os.remove(temp_intro_path)  # Clean up after use
 
         # === Load the main part audio
         part_audio = AudioSegment.from_mp3(part_path)
@@ -87,18 +91,21 @@ def merge_mp3s(AudioSegment, mp3_name, output_dir='output',clean_mp3s=False):
         timestamps.append(f"Part {i} - {timestamp_str}")
 
         # === Concatenate: [Part Intro] + [Pause] + [Part Audio] + [Pause]
-        merged_audio += intro_audio + pause + part_audio + pause
-        # === Update duration tracker
-        current_duration_ms += len(intro_audio) + len(pause) + len(part_audio) + len(pause)
+        if audio_parts:
+            merged_audio += intro_audio + pause + part_audio + pause
+            current_duration_ms += len(intro_audio) + len(pause) + len(part_audio) + len(pause)
+        else:
+            merged_audio += intro_audio + pause + part_audio + pause
+            current_duration_ms = len(pause) + len(part_audio) + len(pause)
 
     # === Export final merged audio
-    final_output = os.path.join(output_dir, f"{mp3_name}_full_with_parts.mp3")
+    final_output = os.path.join(output_dir, f"{mp3_name}_full.mp3")
     merged_audio.export(final_output, format="mp3")
     
     if clean_mp3s:
         # Optional: clear old MP3 files
         for f in os.listdir(output_dir):
-            if f.endswith('.mp3') and f!="amr_analysis_full_with_parts.mp3":
+            if f.endswith('.mp3') and f!=f"{mp3_name}_full.mp3":
                 os.remove(os.path.join(output_dir, f))
 
     # Save timestamps to file
@@ -108,6 +115,4 @@ def merge_mp3s(AudioSegment, mp3_name, output_dir='output',clean_mp3s=False):
             f.write(line + '\n')
 
     print(f"🕒 Timestamps saved to:\n{timestamp_file}")
-
-
     print(f"✅ Merged audio with intros saved to:\n{final_output}")
