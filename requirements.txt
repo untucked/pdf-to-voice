@@ -1,7 +1,5 @@
 gtts
 pdfplumber
-textwrap
 pydub
-tempfile
 pytesseract
 pdf2image
