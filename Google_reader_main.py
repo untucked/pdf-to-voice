@@ -9,33 +9,54 @@ import re
 import time
 import configparser
 import sys
-
+import tkinter as tk
+from tkinter import filedialog
 config = configparser.ConfigParser()
 config.read('config.conf')
+from pydub.utils import which
 
 # local
 import support
 
 # Set paths BEFORE importing AudioSegment
 ffmpeg_path = config.get('paths', 'ffmpeg_path', fallback=None)
-if ffmpeg_path is None or not ffmpeg_path.strip(): # Also check for empty string
-    print('Error: ffmpeg_path is not configured in the CONF file.', file=sys.stderr)
-    raise ValueError('Need to configure ffmpeg_path in order to run this script.')
+if not ffmpeg_path or not ffmpeg_path.strip():
+    raise ValueError("❌ 'ffmpeg_path' is missing from config.conf")
+elif not os.path.isfile(ffmpeg_path):
+    raise FileNotFoundError(f"❌ ffmpeg_path is set to '{ffmpeg_path}', but that file does not exist.")
+
 
 ffprobe_path = config.get('paths', 'ffmpeg_probe', fallback=None)
-if ffprobe_path is None or not ffprobe_path.strip(): # Also check for empty string
-    print('Error: ffprobe_path is not configured in the CONF file.', file=sys.stderr)
-    raise ValueError('Need to configure ffprobe_path in order to run this script.')
+if not ffprobe_path or not ffprobe_path.strip():
+    raise ValueError("❌ 'ffmpeg_probe' is missing from config.conf")
+elif not os.path.isfile(ffprobe_path):
+    raise FileNotFoundError(f"❌ ffmpeg_probe is set to '{ffprobe_path}', but that file does not exist.")
 
+
+AudioSegment.converter = which(ffmpeg_path)
 
 os.environ["PATH"] += os.pathsep + os.path.dirname(ffmpeg_path)  # Add to PATH at runtime
 
 AudioSegment.converter = ffmpeg_path
 AudioSegment.ffprobe = ffprobe_path
 
+test_load_pdf = False
 # === CONFIG ===
-pdf_path = config.get('read', 'read_essay', fallback='Tell-Tale_Heart.pdf')
-# pdf_path = config.get('read', 'read_essay', fallback='picture_pdf_text.pdf')
+if test_load_pdf:
+    pdf_path = config.get('read', 'read_essay', fallback='Tell-Tale_Heart.pdf')
+else:
+    # Prompt user to choose a file via GUI
+    root = tk.Tk()
+    root.withdraw()  # Hide the empty Tkinter window
+    pdf_path = filedialog.askopenfilename(
+        title="Select a PDF to read",
+        filetypes=[("PDF files", "*.pdf")],
+    )
+
+    if not pdf_path:
+        raise ValueError("No file selected — exiting.")
+
+    print(f"📄 Selected file: {pdf_path}")
 if not os.path.exists(pdf_path):
     raise FileNotFoundError(f"❌ PDF not found at: {pdf_path}")
 output_dir = config.get('read', 'output_dir', fallback='output')

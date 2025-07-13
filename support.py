@@ -16,10 +16,10 @@ import sys
 def clean_text(text):
     # Remove bracketed [1], parenthetical (12)
     text = re.sub(r'\[\d+\]', '', text)
-    text = re.sub(r'\(\d+\)', '', text)
+    # text = re.sub(r'\(\d+\)', '', text)
     # Remove sequences like "word 1 ." or "2 ," etc.
-    text = re.sub(r'\b\d{1,3}\s+[.,](?=\s)', '', text)
-    text = re.sub(r'(?<=[a-z])\s\d{1,2}\.(?=\s|$)', '', text)
+    text = re.sub(r'\b\d{1,3}\s+[.,](?=\s)', '.', text)
+    text = re.sub(r'(?<=[a-z])\s\d{1,2}\.(?=\s|$)', ',', text)
     # Remove sequences like "25% 15 )."
     text = re.sub(r'(?<=\S)\s\d{1,3}\s*\)\.', '.', text)
     # Remove ref numbers after a valid year followed by `)` and more refs: "2024) 17 23"
@@ -27,10 +27,14 @@ def clean_text(text):
     # Remove patterns like "2023 9 –" → "2023 –"
     text = re.sub(r'\b\d{1,3}(?=\s*[–-])', '', text)
     # Remove inline sequences like " 1 2 ." or "4\n5 ."
-    text = re.sub(r'(?<=\s)(\d{1,3}(\s+|\n)+)+(?=[\.,\n])', '', text)
+    text = re.sub(r'(?<=\s)(\d{1,3}(\s+|\n)+)+(?=[\.,\n])', '.', text)
     # Collapse multiple spaces
     text = re.sub(r'\s{2,}', ' ', text)
     return text.strip()
+
+def remove_references_section(text: str) -> str:
+    # Match "References" (case-insensitive), followed by anything until the end of the text
+    return re.sub(r'\n?references\b.*', '', text, flags=re.IGNORECASE | re.DOTALL)
 
 def init_pytesseract():
     config = configparser.ConfigParser()
@@ -58,6 +62,8 @@ def get_full_text_ocr(pdf_path):
         pages = convert_from_path(pdf_path, poppler_path=poppler_bin, dpi=300)
     except Exception as e:
         raise RuntimeError(f"🚨 Failed to convert PDF to images: {e}")
+    # remove references section if it exists
+
     for i, page_image in enumerate(pages):
         print(f"Running OCR on page {i + 1}")
         text = pytesseract.image_to_string(page_image)
@@ -102,7 +108,8 @@ def get_full_text(pdf_path, print_text=False):
                 # print(text)
                 cleaned_text = clean_text(text)
                 # print(cleaned_text)
-                full_text += f"\n\n[Page {page_num + 1}]\n{cleaned_text}"
+                full_text += f"\n{cleaned_text}"
+        full_text = remove_references_section(full_text)
     return full_text
 
 def convert_to_mp3(chunks, output_dir, name='mp3_output',
@@ -118,6 +125,9 @@ def convert_to_mp3(chunks, output_dir, name='mp3_output',
                 break
     print(f"✅ Done! Saved {len(chunks)} MP3 files to:\n{output_dir}")
 
+def extract_part_number(filename):
+    match = re.search(r'_part_(\d+)\.mp3$', filename)
+    return int(match.group(1)) if match else float('inf')
 
 def merge_mp3s(AudioSegment, mp3_name, output_dir='output',
                audio_parts=False,
@@ -128,12 +138,17 @@ def merge_mp3s(AudioSegment, mp3_name, output_dir='output',
     pause = AudioSegment.silent(duration=1000)  # 1.0 seconds of silence
 
     # Ensure correct order by sorting
-    mp3_files = sorted([f for f in os.listdir(output_dir) if f.startswith(mp3_name) and f.endswith(".mp3")])
+    mp3_files = sorted([
+        f for f in os.listdir(output_dir)
+        if f.startswith(mp3_name) and f.endswith(".mp3") and not f.endswith("_full.mp3")
+    ], key=extract_part_number)
     timestamps = []
     current_duration_ms = 0  # in milliseconds
     for i, filename in enumerate(mp3_files, 1):
         part_path = os.path.join(output_dir, filename)
-
+        if not os.path.exists(part_path):
+            print(f"⚠️ File not found: {part_path}. Skipping.")
+            continue
         # === Generate "Part N" voice intro
         if audio_parts:
             part_intro_text = f"Part {i}"
@@ -150,6 +165,9 @@ def merge_mp3s(AudioSegment, mp3_name, output_dir='output',
             os.remove(temp_intro_path)  # Clean up after use
 
         # === Load the main part audio
+        print(f"🔍 Trying to load: {part_path}")
+        if not os.path.exists(part_path):
+            raise FileNotFoundError(f"❌ File not found: {part_path}")
         part_audio = AudioSegment.from_mp3(part_path)
 
         # === Record timestamp BEFORE adding this section
@@ -182,3 +200,39 @@ def merge_mp3s(AudioSegment, mp3_name, output_dir='output',
 
     print(f"🕒 Timestamps saved to:\n{timestamp_file}")
     print(f"✅ Merged audio with intros saved to:\n{final_output}")
+
+if __name__ == "__main__":
+    from pydub import AudioSegment
+    config = configparser.ConfigParser()
+    config.read('config.conf')
+    from pydub.utils import which
+    output_dir = config.get('read', 'output_dir', fallback='output')
+
+    # Set paths BEFORE importing AudioSegment
+    ffmpeg_path = config.get('paths', 'ffmpeg_path', fallback=None)
+    if not ffmpeg_path or not ffmpeg_path.strip():
+        raise ValueError("❌ 'ffmpeg_path' is missing from config.conf")
+    elif not os.path.isfile(ffmpeg_path):
+        raise FileNotFoundError(f"❌ ffmpeg_path is set to '{ffmpeg_path}', but that file does not exist.")
+
+
+    ffprobe_path = config.get('paths', 'ffmpeg_probe', fallback=None)
+    if not ffprobe_path or not ffprobe_path.strip():
+        raise ValueError("❌ 'ffmpeg_probe' is missing from config.conf")
+    elif not os.path.isfile(ffprobe_path):
+        raise FileNotFoundError(f"❌ ffmpeg_probe is set to '{ffprobe_path}', but that file does not exist.")
+
+
+    AudioSegment.converter = which(ffmpeg_path)
+
+    os.environ["PATH"] += os.pathsep + os.path.dirname(ffmpeg_path)  # Add to PATH at runtime
+
+    AudioSegment.converter = ffmpeg_path
+    AudioSegment.ffprobe = ffprobe_path
+
+    pdf_path = r'C:\Users\eylan\Downloads\Oscar Health (OSCR) Deep Dive.pdf'
+    print(f"📄 Selected file: {pdf_path}")
+    base_name = os.path.basename(pdf_path)
+    file_name_without_extension, _ = os.path.splitext(base_name)
+    mp3_name = f'{file_name_without_extension}_mp3'
+    merge_mp3s(AudioSegment, mp3_name, output_dir=output_dir,clean_mp3s=False)

@@ -98,4 +98,5 @@ venv/
 # config
 config.conf
 
-output/
+output/*
+!output/.gitkeep
